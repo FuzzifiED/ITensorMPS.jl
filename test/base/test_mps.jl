@@ -1334,7 +1334,7 @@ end
     ψ = orthogonalize(ψ0, 2)
     A = prod(ITensorMPS.data(ψ)[2:(N - 1)])
     randn!(A)
-    ψ[2:(N - 1), orthocenter=3] = A
+    ψ[2:(N - 1), orthocenter = 3] = A
     @test prod(ψ) ≈ ψ[1] * A * ψ[N]
     @test maxlinkdim(ψ) == 4
     @test ITensorMPS.orthocenter(ψ) == 3
@@ -1421,6 +1421,18 @@ end
         @test siteind(ψ̃, n) == siteind(ψ, n)
       end
       @test maxlinkdim(ψ̃) == 1
+    end
+  end
+
+  @testset "movesites tags" begin
+    N = 4
+    s0 = siteinds("S=1/2", N)
+    ψ0 = random_mps(s0; linkdims=1)
+    for perm in permutations(1:N)
+      s = s0[perm]
+      ns′ = [findfirst(==(i), s0) for i in s]
+      ψ = movesites(ψ0, 1:N .=> ns′; cutoff=1e-15)
+      @test ITensorMPS.hasdefaultlinktags(ψ)
     end
   end
 

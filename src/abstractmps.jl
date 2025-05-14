@@ -694,7 +694,7 @@ end
 # TODO: change kwarg from `set_limits` to `preserve_ortho`
 function map!(f::Function, M::AbstractMPS; set_limits::Bool=true)
   for i in eachindex(M)
-    M[i, set_limits=set_limits] = f(M[i])
+    M[i, set_limits = set_limits] = f(M[i])
   end
   return M
 end
@@ -1306,7 +1306,7 @@ of the orthogonality center to avoid numerical overflow in the case of diverging
 See also [`normalize!`](@ref), [`norm`](@ref), [`lognorm`](@ref).
 """
 function normalize(M::AbstractMPS; (lognorm!)=[])
-  return normalize!(deepcopy_ortho_center(M); (lognorm!)=lognorm!)
+  return normalize!(deepcopy_ortho_center(M); (lognorm!)=(lognorm!))
 end
 
 """
@@ -1907,7 +1907,20 @@ function setindex!(
     end
   end
 
-  ψA = MPST(A, sites; leftinds=lind, orthocenter=orthocenter - first(r) + 1, kwargs...)
+  # use the first link index if present, otherwise use the default tag
+  linktags = TagSet[
+    (b=linkind(ψ, i); isnothing(b) ? defaultlinkindtags(i) : tags(b)) for
+    i in firstsite:(lastsite - 1)
+  ]
+
+  ψA = MPST(
+    A,
+    sites;
+    leftinds=lind,
+    orthocenter=orthocenter - first(r) + 1,
+    tags=linktags,
+    kwargs...,
+  )
   #@assert prod(ψA) ≈ A
 
   ψ[firstsite:lastsite] = ψA
@@ -1942,11 +1955,20 @@ by site according to the site indices `sites`.
    in `sites` and `leftinds` will be dangling off of the right side of the MPS/MPO.
 - `orthocenter::Integer = length(sites)`: the desired final orthogonality
    center of the output MPS/MPO.
+- `tags = [defaultlinktags(i) for i in 1:(length(sites) - 1)]`:
+   the tags to use for the link indices. The length of `tags` must be
+   `length(sites) - 1`. The default is to use the default link tags for each
+   site.
 - `cutoff`: the desired truncation error at each link.
 - `maxdim`: the maximum link dimension.
 """
 function (::Type{MPST})(
-  A::ITensor, sites; leftinds=nothing, orthocenter::Integer=length(sites), kwargs...
+  A::ITensor,
+  sites;
+  leftinds=nothing,
+  orthocenter::Integer=length(sites),
+  tags=[defaultlinktags(i) for i in 1:(length(sites) - 1)],
+  kwargs...,
 ) where {MPST<:AbstractMPS}
   N = length(sites)
   for s in sites
@@ -1967,7 +1989,7 @@ function (::Type{MPST})(
     if !isnothing(l)
       Lis = unioninds(Lis, l)
     end
-    L, R = factorize(Ã, Lis; kwargs..., tags="Link,n=$n", ortho="left")
+    L, R = factorize(Ã, Lis; kwargs..., tags=tags[n], ortho="left")
     l = commonind(L, R)
     ψ[n] = L
     Ã = R
@@ -2001,7 +2023,7 @@ function swapbondsites(ψ::AbstractMPS, b::Integer; ortho="right", kwargs...)
   elseif rightlim(ψ) > b + 2
     ψ = orthogonalize(ψ, b + 1)
   end
-  ψ[b:(b + 1), orthocenter=orthocenter, perm=[2, 1], kwargs...] = ψ[b] * ψ[b + 1]
+  ψ[b:(b + 1), orthocenter = orthocenter, perm = [2, 1], kwargs...] = ψ[b] * ψ[b + 1]
   return ψ
 end
 
